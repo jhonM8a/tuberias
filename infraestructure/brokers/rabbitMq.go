@@ -1,4 +1,4 @@
-package infraestructure
+package brokers
 
 import (
 	"github.com/streadway/amqp"

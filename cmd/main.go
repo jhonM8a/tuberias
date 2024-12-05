@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"tuberias/config"
-	broker "tuberias/infraestructureFacade"
+	config "tuberias/config"
+	broker "tuberias/infraestructure/factory"
+	filterMetadata "tuberias/services/impl"
 )
 
 func main() {
@@ -13,17 +14,16 @@ func main() {
 	// [1] Cargar propiedades
 	fmt.Println(" <-- [1] Cargar propiedades -->")
 
-	connectionString, err := config.GetConnectionStringRabbitMq()
+	config, err := config.GetConnectionStringRabbitMq()
 	if err != nil {
 		log.Fatalf("Error al obtener la cadena de conexión: %v", err)
 	}
-	fmt.Println("RabbitMQ Connection String:", connectionString)
+	fmt.Println("RabbitMQ Connection String:", config.ConnectionString)
 
 	// [2] Crear conexión
 	fmt.Println(" <-- [2] Crear conexión  -->")
-	brokerType := "rabbitmq" // Podría cambiar a "kafka"
 
-	b, err := broker.NewBroker(brokerType, connectionString)
+	b, err := broker.NewBroker(config.BrokerName, config.ConnectionString)
 	if err != nil {
 		log.Fatalf("Error creating broker: %v", err)
 	}
@@ -34,17 +34,17 @@ func main() {
 	}
 
 	// Escuchar mensajes continuamente
-	queueName := "test_queue"
-	msgChan, err := b.Consume(queueName)
+	msgChan, err := b.Consume(config.QueueName)
 	if err != nil {
-		log.Fatalf("Error al consumir mensajes de la cola '%s': %v", queueName, err)
+		log.Fatalf("Error al consumir mensajes de la cola '%s': %v", config.QueueName, err)
 	}
 
-	fmt.Printf("Esperando mensajes en la cola '%s'...\n", queueName)
+	fmt.Printf("Esperando mensajes en la cola '%s'...\n", config.QueueName)
 
 	// Bucle infinito para procesar los mensajes
 	for msg := range msgChan {
 		fmt.Printf("Mensaje recibido: %s\n", string(msg))
 		// Aquí puedes agregar lógica para procesar el mensaje.
+		filterMetadata.FiletMetadata(string(msg))
 	}
 }
