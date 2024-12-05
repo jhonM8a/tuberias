@@ -31,18 +31,16 @@ func FiletMetadata(fileId string) {
 	}
 	defer dbFacade.Close()
 
-	// Define el correo a buscar
-
-	// Consulta en la tabla usuarios
+	// Consulta en la tabla file
 	var id int
 	var namefile, metadata string
-	query := "SELECT id, namefile, metadata FROM file WHERE uuid = ? LIMIT 1" // Cambia ? por $1 para PostgreSQL
+	query := "SELECT id, namefile, metadata FROM file WHERE uuid = ? LIMIT 1" //
 
 	err = dbFacade.QueryRowByField(query, fileId, &id, &namefile, &metadata)
 	if err != nil {
 		log.Fatalf("Error al obtener el usuario: %v", err)
 	}
 
-	fmt.Printf("Usuario encontrado: ID=%d, Nombre=%s, Correo=%s\n", id, namefile, metadata)
+	fmt.Printf("archivo encontrado: ID=%d, NombreArchivo=%s, metadata=%s\n", id, namefile, metadata)
 
 }
