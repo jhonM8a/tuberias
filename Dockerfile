@@ -12,7 +12,7 @@ WORKDIR /app
 COPY . .
 
 # Compila el programa Go
-RUN go build -o main .
+RUN go build -o cmd/main .
 
 # Crea una imagen final minimalista
 FROM alpine:latest
