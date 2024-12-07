@@ -3,7 +3,7 @@ name: Publish Docker Image
 on:
   push:
     branches:
-      - CD  # Cambia a la rama deseada para activar el workflow
+      - main  # Cambia a la rama deseada para activar el workflow
 
 jobs:
   build-and-push:
