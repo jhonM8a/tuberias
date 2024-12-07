@@ -28,8 +28,16 @@ A continuación, se describen las variables de entorno que deben ser configurada
 2. Ejecuta los siguientes comandos para establecer las variables de entorno:
 
    ```bash
-   export RABBITMQ_USER=admin
-   export RABBITMQ_PASS=admin123
-   export RABBITMQ_HOST=181.79.9.72
-   export RABBITMQ_PORT=6457
-   export RABBITMQ_QUEUE_NAME_FILES=fileToProcess
+export RABBITMQ_USER=admin
+export RABBITMQ_PASS=admin123
+export RABBITMQ_HOST=181.79.9.72
+export RABBITMQ_PORT=6457
+export RABBITMQ_QUEUE_NAME_FILES=test_queue
+export BROKER_NAME=rabbitmq
+export DB_USER=root
+export DB_PASSWORD=mysql
+export DB_HOST=181.79.9.72
+export DB_PORT=6447
+export DB_DATABASENAME=Archivos
+export DB_ENGINE=mysql
+
