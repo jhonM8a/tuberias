@@ -44,7 +44,6 @@ func main() {
 	// Bucle infinito para procesar los mensajes
 	for msg := range msgChan {
 		fmt.Printf("Mensaje recibido: %s\n", string(msg))
-		// Aquí puedes agregar lógica para procesar el mensaje.
 		filterMetadata.FiletMetadata(string(msg))
 	}
 }
