@@ -15,3 +15,7 @@ func (m *MySQLConnector) Connect(dsn string) (*sql.DB, error) {
 	}
 	return db, db.Ping()
 }
+
+func (m *MySQLConnector) Insert(collection string, document interface{}) error {
+	return nil
+}

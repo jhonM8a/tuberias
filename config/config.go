@@ -16,6 +16,11 @@ type ConfigConnectionDatabase struct {
 	Database         string
 }
 
+type ConfigConnectionDatabaseNoSQL struct {
+	ConnectionString string
+	Database         string
+}
+
 func GetConnectionStringRabbitMq() (ConfigConnectionBroker, error) {
 	user, err := getEnv("RABBITMQ_USER")
 	if err != nil {
@@ -99,6 +104,47 @@ func GetConnectionDatabse() (ConfigConnectionDatabase, error) {
 
 	return configConnectionDatabase, nil
 
+}
+
+func GetConnectionDatabaseNoSQL() (ConfigConnectionDatabaseNoSQL, error) {
+	// Obtén las variables de entorno específicas de MongoDB
+	user, err := getEnv("NOSQL_DB_USER") // root
+	if err != nil {
+		return ConfigConnectionDatabaseNoSQL{}, err
+	}
+
+	pass, err := getEnv("NOSQL_DB_PASSWORD") // rootpassword123
+	if err != nil {
+		return ConfigConnectionDatabaseNoSQL{}, err
+	}
+
+	host, err := getEnv("NOSQL_DB_HOST") // 181.79.9.72
+	if err != nil {
+		return ConfigConnectionDatabaseNoSQL{}, err
+	}
+
+	port, err := getEnv("NOSQL_DB_PORT") // 6451
+	if err != nil {
+		return ConfigConnectionDatabaseNoSQL{}, err
+	}
+
+	database, err := getEnv("NOSQL_NAME") // admin
+	if err != nil {
+		return ConfigConnectionDatabaseNoSQL{}, err
+	}
+
+	// Construir la cadena de conexión de MongoDB
+	connectionString := fmt.Sprintf(
+		"mongodb://%s:%s@%s:%s/?authMechanism=SCRAM-SHA-1&authSource=admin",
+		user, pass, host, port,
+	)
+
+	configConnectionDatabaseNoSQL := ConfigConnectionDatabaseNoSQL{
+		ConnectionString: connectionString,
+		Database:         database,
+	}
+
+	return configConnectionDatabaseNoSQL, nil
 }
 
 func getEnv(key string) (string, error) {

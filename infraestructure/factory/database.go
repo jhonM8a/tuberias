@@ -20,3 +20,12 @@ func (f *DatabaseFactory) GetDatabaseConnector(dbType string) (interfaceInfraest
 		return nil, fmt.Errorf("tipo de base de datos no soportado: %s", dbType)
 	}
 }
+
+func (f *DatabaseFactory) GetDatabaseConnectorNoSQL(dbType string) (interfaceInfraestucture.DatabaseConnectorWithOperations, error) {
+	switch dbType {
+	case "mongo":
+		return &databases.MongoDBConnector{}, nil
+	default:
+		return nil, fmt.Errorf("tipo de base de datos no soportado: %s", dbType)
+	}
+}
