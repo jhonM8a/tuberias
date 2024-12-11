@@ -1,6 +1,9 @@
 package filterMetadata
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -46,8 +49,55 @@ func FiletMetadata(fileId string) {
 		updatedMetadata := ComplementMetadata(namefile, metadata, fileId)
 		SaveData(updatedMetadata)
 		fmt.Printf("Metadata actualizada: %s\n", updatedMetadata)
-
 	}
+
+	query = "SELECT id, archivo FROM file WHERE uuid = ? LIMIT 1"
+
+	var archivo []byte
+	err = dbFacade.QueryRowByField(query, fileId, &id, &archivo)
+
+	if err != nil {
+		log.Printf("Error al obtener info del archivo con uuid: %s [ERROR] ->[%v]", fileId, err)
+		hash := generateHash(archivo)
+		fmt.Printf("archivo encontrado: ID=%d, Archivo=%s, Hash=%x\n", id, archivo, hash)
+	} else {
+		fmt.Printf("archivo encontrado: ID=%d, Archivo=%s\n", id, archivo)
+	}
+
+	privateKey, err := config.LoadPrivateKeyFromFile("private_key.pem")
+	if err != nil {
+		fmt.Println("Error al cargar la clave privada:", err)
+		return
+	}
+
+	publicKey, err := config.LoadPublicKeyFromFile("public_key.pem")
+	if err != nil {
+		fmt.Println("Error al cargar la clave pública:", err)
+		return
+	}
+
+	fmt.Println("Clave Privada:", privateKey)
+	fmt.Println("Clave Pública:", publicKey)
+
+	encrypt_data, nil := encryptData(publicKey, archivo)
+
+	if err != nil {
+		fmt.Println("Error al cifrar los datos:", err)
+	}
+
+	fmt.Println("Datos cifrados:", encrypt_data)
+
+	decrypt_data, nil := decryptData(privateKey, encrypt_data)
+
+	if err != nil {
+		fmt.Println("Error al descifrar los datos:", err)
+	}
+
+	fmt.Println("Datos descifrados:", decrypt_data)
+
+	texto := string(decrypt_data)
+
+	fmt.Println("Texto descifrado:", texto)
 
 }
 
@@ -109,4 +159,28 @@ func SaveData(updatedMetadata string) {
 
 	}
 
+}
+
+func generateHash(data []byte) []byte {
+	hash := sha256.Sum256(data)
+	return hash[:]
+}
+
+func encryptData(publicKey *rsa.PublicKey, data []byte) ([]byte, error) {
+	// Cifrar los datos con la clave pública
+	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKey, data, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error al cifrar los datos: %v", err)
+	}
+	return ciphertext, nil
+}
+
+// Función para descifrar datos usando la clave privada
+func decryptData(privateKey *rsa.PrivateKey, ciphertext []byte) ([]byte, error) {
+	// Descifrar los datos con la clave privada
+	plaintext, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error al descifrar los datos: %v", err)
+	}
+	return plaintext, nil
 }

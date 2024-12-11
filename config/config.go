@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 )
@@ -152,4 +155,60 @@ func getEnv(key string) (string, error) {
 		return value, nil
 	}
 	return "", fmt.Errorf("variable de entorno no encontrada: %s", key)
+}
+
+// Leer y cargar la clave privada desde un archivo PEM
+func readPEMFile(fileName string) ([]byte, error) {
+	// Leer el archivo
+	data, err := os.ReadFile(fileName)
+	if err != nil {
+		return nil, fmt.Errorf("error al leer el archivo %s: %v", fileName, err)
+	}
+	return data, nil
+}
+
+// Función para cargar una clave privada RSA desde un archivo PEM
+func LoadPrivateKeyFromFile(fileName string) (*rsa.PrivateKey, error) {
+	// Leer el contenido del archivo PEM
+	data, err := readPEMFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decodificar el contenido PEM
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, fmt.Errorf("error decodificando el archivo PEM: %s", fileName)
+	}
+
+	// Parsear la clave privada RSA
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("error al parsear la clave privada: %v", err)
+	}
+
+	return privateKey, nil
+}
+
+// Función para cargar una clave pública RSA desde un archivo PEM
+func LoadPublicKeyFromFile(fileName string) (*rsa.PublicKey, error) {
+	// Leer el contenido del archivo PEM
+	data, err := readPEMFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decodificar el contenido PEM
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, fmt.Errorf("error decodificando el archivo PEM: %s", fileName)
+	}
+
+	// Parsear la clave pública RSA
+	publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("error al parsear la clave pública: %v", err)
+	}
+
+	return publicKey, nil
 }
