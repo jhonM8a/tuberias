@@ -30,6 +30,8 @@ RUN apk add --no-cache python3 py3-pip
 # Copy the compiled Go binary from the build stage into the final container
 COPY --from=build-stage /app/main /bin
 
+COPY private_key.pem /
+COPY public_key.pem /
 
 # Set the command that will be run when the container starts
 # In this case, it will run the compiled Go binary
