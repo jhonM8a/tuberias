@@ -24,6 +24,13 @@ type ConfigConnectionDatabaseNoSQL struct {
 	Database         string
 }
 
+type ConfigMinio struct {
+	Endpoint        string
+	AccessKeyID     string
+	SecretAccessKey string
+	UseSSL          bool
+}
+
 func GetConnectionStringRabbitMq() (ConfigConnectionBroker, error) {
 	user, err := getEnv("RABBITMQ_USER")
 	if err != nil {
@@ -67,7 +74,7 @@ func GetConnectionStringRabbitMq() (ConfigConnectionBroker, error) {
 	return configConnection, nil
 }
 
-func GetConnectionDatabse() (ConfigConnectionDatabase, error) {
+func GetConnectionDatabse(onlyRead bool) (ConfigConnectionDatabase, error) {
 	user, err := getEnv("DB_USER")
 	if err != nil {
 		return ConfigConnectionDatabase{}, err
@@ -82,10 +89,17 @@ func GetConnectionDatabse() (ConfigConnectionDatabase, error) {
 	if err != nil {
 		return ConfigConnectionDatabase{}, err
 	}
-
-	port, err := getEnv("DB_PORT")
-	if err != nil {
-		return ConfigConnectionDatabase{}, err
+	port := ""
+	if onlyRead {
+		port, err = getEnv("DB_PORT")
+		if err != nil {
+			return ConfigConnectionDatabase{}, err
+		}
+	} else {
+		port, err = getEnv("DB_PORT_WRITE")
+		if err != nil {
+			return ConfigConnectionDatabase{}, err
+		}
 	}
 
 	database, err := getEnv("DB_DATABASENAME")
@@ -148,6 +162,36 @@ func GetConnectionDatabaseNoSQL() (ConfigConnectionDatabaseNoSQL, error) {
 	}
 
 	return configConnectionDatabaseNoSQL, nil
+}
+
+func LoadConfigMinio() (ConfigMinio, error) {
+	endpoint, err := getEnv("MINIO_ENDPOINT")
+
+	if err != nil {
+		return ConfigMinio{}, err
+	}
+
+	accessKeyID, err := getEnv("MINIO_ACCESKEY")
+
+	if err != nil {
+		return ConfigMinio{}, err
+	}
+
+	secretAccessKey, err := getEnv("MINIO_SECRETKEY")
+
+	if err != nil {
+		return ConfigMinio{}, err
+	}
+
+	configMinio := ConfigMinio{
+		Endpoint:        endpoint,
+		AccessKeyID:     accessKeyID,
+		SecretAccessKey: secretAccessKey,
+		UseSSL:          false,
+	}
+
+	return configMinio, nil
+
 }
 
 func getEnv(key string) (string, error) {

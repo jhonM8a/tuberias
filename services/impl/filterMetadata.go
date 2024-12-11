@@ -4,17 +4,19 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	config "tuberias/config"
 	facadeDB "tuberias/infraestructure/facade"
 	factoryDB "tuberias/infraestructure/factory"
+	"tuberias/infraestructure/file"
 )
 
 func FiletMetadata(fileId string) {
 
-	cfg, error := config.GetConnectionDatabse()
+	cfg, error := config.GetConnectionDatabse(true)
 
 	if error != nil {
 		log.Fatalf("Error al obtener las propiedades de conexión a base de datos: %v", error)
@@ -49,6 +51,7 @@ func FiletMetadata(fileId string) {
 		updatedMetadata := ComplementMetadata(namefile, metadata, fileId)
 		SaveData(updatedMetadata)
 		fmt.Printf("Metadata actualizada: %s\n", updatedMetadata)
+
 	}
 
 	query = "SELECT id, archivo FROM file WHERE uuid = ? LIMIT 1"
@@ -58,46 +61,97 @@ func FiletMetadata(fileId string) {
 
 	if err != nil {
 		log.Printf("Error al obtener info del archivo con uuid: %s [ERROR] ->[%v]", fileId, err)
-		hash := generateHash(archivo)
-		fmt.Printf("archivo encontrado: ID=%d, Archivo=%s, Hash=%x\n", id, archivo, hash)
 	} else {
+		hash := generateHash(archivo)
+
+		//save original file
+		errFile := file.UploadFileToMinioBinary("files", fileId+"-"+namefile, archivo)
+		if errFile != nil {
+			fmt.Println("Error al cargar el archivo original: %v", errFile)
+			return
+		}
+
+		updateHasFile(fileId, hex.EncodeToString((hash)))
+
 		fmt.Printf("archivo encontrado: ID=%d, Archivo=%s\n", id, archivo)
+
+		privateKey, err := config.LoadPrivateKeyFromFile("private_key.pem")
+		if err != nil {
+			fmt.Println("Error al cargar la clave privada:", err)
+			return
+		}
+
+		publicKey, err := config.LoadPublicKeyFromFile("public_key.pem")
+		if err != nil {
+			fmt.Println("Error al cargar la clave pública:", err)
+			return
+		}
+
+		fmt.Println("Clave Privada: <<<<Encontrada>>>>")
+		fmt.Println("Clave Pública: <<<<Encontrada>>>>")
+
+		encrypt_data, nil := encryptData(publicKey, archivo)
+
+		if err != nil {
+			fmt.Println("Error al cifrar los datos:", err)
+		}
+
+		fmt.Println("Datos cifrados correctamente")
+
+		errFile = file.UploadFileToMinioBinary("files", fileId+"-Encrypt-"+namefile, encrypt_data)
+		if errFile != nil {
+			fmt.Println("Error al cargar el archivo original: %v", errFile)
+		}
+
+		decrypt_data, nil := decryptData(privateKey, encrypt_data)
+
+		if err != nil {
+			fmt.Println("Error al descifrar los datos:", err)
+		}
+
+		fmt.Println("Datos descifrados correctamente")
+
+		texto := string(decrypt_data)
+
+		fmt.Println("Texto descifrado:", texto)
+	}
+}
+
+func updateHasFile(fileId, hash string) {
+
+	cfg, error := config.GetConnectionDatabse(false)
+
+	if error != nil {
+		log.Fatalf("Error al obtener las propiedades de conexión a base de datos: %v", error)
 	}
 
-	privateKey, err := config.LoadPrivateKeyFromFile("private_key.pem")
+	factory := &factoryDB.DatabaseFactory{}
+
+	connector, err := factory.GetDatabaseConnector(cfg.Database)
+
 	if err != nil {
-		fmt.Println("Error al cargar la clave privada:", err)
-		return
+		log.Fatalf("Error al obtener el conector: %v", err)
 	}
 
-	publicKey, err := config.LoadPublicKeyFromFile("public_key.pem")
-	if err != nil {
-		fmt.Println("Error al cargar la clave pública:", err)
-		return
-	}
-
-	fmt.Println("Clave Privada:", privateKey)
-	fmt.Println("Clave Pública:", publicKey)
-
-	encrypt_data, nil := encryptData(publicKey, archivo)
+	dbFacade, err := facadeDB.NewDatabaseFacade(connector, cfg.ConnectionString)
 
 	if err != nil {
-		fmt.Println("Error al cifrar los datos:", err)
+		log.Fatalf("Error al conectar a la base de datos: %v", err)
 	}
+	defer dbFacade.Close()
 
-	fmt.Println("Datos cifrados:", encrypt_data)
-
-	decrypt_data, nil := decryptData(privateKey, encrypt_data)
+	updateQuery := "UPDATE file SET hash = ? WHERE uuid = ?"
+	result, err := dbFacade.Update(updateQuery, hash, fileId)
 
 	if err != nil {
-		fmt.Println("Error al descifrar los datos:", err)
+		log.Fatalf("Error al ejecutar el update: %v", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Fatalf("Error al obtener el número de filas afectadas: %v", err)
 	}
 
-	fmt.Println("Datos descifrados:", decrypt_data)
-
-	texto := string(decrypt_data)
-
-	fmt.Println("Texto descifrado:", texto)
+	fmt.Printf("Número de filas afectadas: %d\n", rowsAffected)
 
 }
 
@@ -119,6 +173,11 @@ func ComplementMetadata(namefile, metadata, fileId string) string {
 	if err != nil {
 		log.Printf("Error al convertir metadata a JSON: %v", err)
 		return metadata // Retornar la metadata original en caso de error
+	}
+
+	errFile := file.UploadFileToMinioBinary("files", fileId+"-"+namefile+".json", updatedMetadata)
+	if errFile != nil {
+		fmt.Println("Error al cargar el archivo original: %v", errFile)
 	}
 
 	return string(updatedMetadata)
