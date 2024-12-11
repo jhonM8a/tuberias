@@ -6,4 +6,5 @@ type FileInfo struct {
 	NameFile string
 	Metadata string
 	Hash     string
+	Archivo  []byte
 }

@@ -34,6 +34,14 @@ func (d *DatabaseFacade) QueryRowByField(query string, fieldValue interface{}, d
 	return nil
 }
 
+func (d *DatabaseFacade) Update(query string, args ...interface{}) (sql.Result, error) {
+	result, err := d.DB.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (d *DatabaseFacade) Close() {
 	if err := d.DB.Close(); err != nil {
 		log.Printf("Error al cerrar la conexión a la base de datos: %v", err)

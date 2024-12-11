@@ -1,17 +1,22 @@
 package filterMetadata
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	config "tuberias/config"
 	facadeDB "tuberias/infraestructure/facade"
 	factoryDB "tuberias/infraestructure/factory"
+	"tuberias/infraestructure/file"
 )
 
 func FiletMetadata(fileId string) {
 
-	cfg, error := config.GetConnectionDatabse()
+	cfg, error := config.GetConnectionDatabse(true)
 
 	if error != nil {
 		log.Fatalf("Error al obtener las propiedades de conexión a base de datos: %v", error)
@@ -49,6 +54,105 @@ func FiletMetadata(fileId string) {
 
 	}
 
+	query = "SELECT id, archivo FROM file WHERE uuid = ? LIMIT 1"
+
+	var archivo []byte
+	err = dbFacade.QueryRowByField(query, fileId, &id, &archivo)
+
+	if err != nil {
+		log.Printf("Error al obtener info del archivo con uuid: %s [ERROR] ->[%v]", fileId, err)
+	} else {
+		hash := generateHash(archivo)
+
+		//save original file
+		errFile := file.UploadFileToMinioBinary("files", fileId+"-"+namefile, archivo)
+		if errFile != nil {
+			fmt.Println("Error al cargar el archivo original: %v", errFile)
+			return
+		}
+
+		updateHasFile(fileId, hex.EncodeToString((hash)))
+
+		fmt.Printf("archivo encontrado: ID=%d, Archivo=%s\n", id, archivo)
+
+		privateKey, err := config.LoadPrivateKeyFromFile("private_key.pem")
+		if err != nil {
+			fmt.Println("Error al cargar la clave privada:", err)
+			return
+		}
+
+		publicKey, err := config.LoadPublicKeyFromFile("public_key.pem")
+		if err != nil {
+			fmt.Println("Error al cargar la clave pública:", err)
+			return
+		}
+
+		fmt.Println("Clave Privada: <<<<Encontrada>>>>")
+		fmt.Println("Clave Pública: <<<<Encontrada>>>>")
+
+		encrypt_data, nil := encryptData(publicKey, archivo)
+
+		if err != nil {
+			fmt.Println("Error al cifrar los datos:", err)
+		}
+
+		fmt.Println("Datos cifrados correctamente")
+
+		errFile = file.UploadFileToMinioBinary("files", fileId+"-Encrypt-"+namefile, encrypt_data)
+		if errFile != nil {
+			fmt.Println("Error al cargar el archivo original: %v", errFile)
+		}
+
+		decrypt_data, nil := decryptData(privateKey, encrypt_data)
+
+		if err != nil {
+			fmt.Println("Error al descifrar los datos:", err)
+		}
+
+		fmt.Println("Datos descifrados correctamente")
+
+		texto := string(decrypt_data)
+
+		fmt.Println("Texto descifrado:", texto)
+	}
+}
+
+func updateHasFile(fileId, hash string) {
+
+	cfg, error := config.GetConnectionDatabse(false)
+
+	if error != nil {
+		log.Fatalf("Error al obtener las propiedades de conexión a base de datos: %v", error)
+	}
+
+	factory := &factoryDB.DatabaseFactory{}
+
+	connector, err := factory.GetDatabaseConnector(cfg.Database)
+
+	if err != nil {
+		log.Fatalf("Error al obtener el conector: %v", err)
+	}
+
+	dbFacade, err := facadeDB.NewDatabaseFacade(connector, cfg.ConnectionString)
+
+	if err != nil {
+		log.Fatalf("Error al conectar a la base de datos: %v", err)
+	}
+	defer dbFacade.Close()
+
+	updateQuery := "UPDATE file SET hash = ? WHERE uuid = ?"
+	result, err := dbFacade.Update(updateQuery, hash, fileId)
+
+	if err != nil {
+		log.Fatalf("Error al ejecutar el update: %v", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Fatalf("Error al obtener el número de filas afectadas: %v", err)
+	}
+
+	fmt.Printf("Número de filas afectadas: %d\n", rowsAffected)
+
 }
 
 // ComplementMetadata complementa el JSON de metadata con fileName y fileId
@@ -69,6 +173,11 @@ func ComplementMetadata(namefile, metadata, fileId string) string {
 	if err != nil {
 		log.Printf("Error al convertir metadata a JSON: %v", err)
 		return metadata // Retornar la metadata original en caso de error
+	}
+
+	errFile := file.UploadFileToMinioBinary("files", fileId+"-"+namefile+".json", updatedMetadata)
+	if errFile != nil {
+		fmt.Println("Error al cargar el archivo original: %v", errFile)
 	}
 
 	return string(updatedMetadata)
@@ -109,4 +218,28 @@ func SaveData(updatedMetadata string) {
 
 	}
 
+}
+
+func generateHash(data []byte) []byte {
+	hash := sha256.Sum256(data)
+	return hash[:]
+}
+
+func encryptData(publicKey *rsa.PublicKey, data []byte) ([]byte, error) {
+	// Cifrar los datos con la clave pública
+	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKey, data, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error al cifrar los datos: %v", err)
+	}
+	return ciphertext, nil
+}
+
+// Función para descifrar datos usando la clave privada
+func decryptData(privateKey *rsa.PrivateKey, ciphertext []byte) ([]byte, error) {
+	// Descifrar los datos con la clave privada
+	plaintext, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error al descifrar los datos: %v", err)
+	}
+	return plaintext, nil
 }
